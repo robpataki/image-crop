@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Image crop</title>
+  <style>
+    body {
+      font-family: Arial, Verdana, sans-serif;
+    }
+
+    canvas {
+      background-color: rgb(255, 255, 0, 10%);
+      border: 2px solid red;
+      margin: 1rem 0;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 
+  - Load source image into preview area  
+  - Apply fixed crop area (7:9) to the preview image  
+  - Optionally rotate preview image (maintain fixed crop area)
+  - Enforce minimum width and height 531x413px (green/red status)
+  - Export edited image as bytearray
+-->
+
+  <div>
+    <label for="photo-upload">Upload photo</label>
+    <input type="file" name="photo-upload" id="photo-upload" accept=".jpg,.png,.webp,.jpeg,.gif" />
+  </div>
+  <br />
+  <div>
+    <button type="button" id="rotate-button">Rotate 90 deg</button>
+    <button type="button" id="save-button">Save image</button>
+  </div>
+  <hr/>
+  <div>
+    Source canvas
+    <canvas id="source-canvas"></canvas>
+    <br/>
+    Editor canvas
+    <canvas id="editor-canvas"></canvas>
+  </div>
+
+  <script src="image-crop.js"></script>
+</body>
+
+</html>
