@@ -9,8 +9,8 @@
     }
 
     canvas {
-      background-color: rgb(255, 255, 0, 10%);
-      border: 2px solid red;
+      border: 2px solid rgb(0, 0, 0, 50%);
+      background: rgb(255, 0, 0, 5%);
       margin: 1rem 0;
     }
   </style>
@@ -29,18 +29,30 @@
     <label for="photo-upload">Upload photo</label>
     <input type="file" name="photo-upload" id="photo-upload" accept=".jpg,.png,.webp,.jpeg,.gif" />
   </div>
+  <br/>
+  <hr/>
+  <div id="status-message">...</div>
+  <hr/>
   <br />
   <div>
     <button type="button" id="rotate-button">Rotate 90 deg</button>
+    <button type="button" id="reset-button">Reset</button>
     <button type="button" id="save-button">Save image</button>
   </div>
   <hr/>
   <div>
-    Source canvas
-    <canvas id="source-canvas"></canvas>
-    <br/>
-    Editor canvas
     <canvas id="editor-canvas"></canvas>
+    <br/>
+    <hr />
+    <button type="button" id="toggle-source-button">Toggle source</button>
+    <div id="source-image" style="display: none;">
+      <h2>Source image</h2>
+      <canvas id="source-canvas"></canvas>
+      <div>
+        <h3>Source image details</h3>
+        <span id="source-image-details">...</span>
+      </div>
+    </div>
   </div>
 
   <script src="image-crop.js"></script>
