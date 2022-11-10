@@ -1,9 +1,12 @@
+// TODO - Render with SCALE
+// TODO - Make Crop area resizable
+// TODO - Determine and lock to minimum crop area
 
-const ASPECT_RATIO = 0.8;
+const ASPECT_RATIO = 35/45; //7:9
 const EDITOR_HEIGHT = 375;
 const EDITOR_WIDTH = EDITOR_HEIGHT * ASPECT_RATIO;
 
-const CANVAS_SCALE = 1;//window.devicePixelRatio;
+const SCALE = window.devicePixelRatio;
 const VIEWPORT_WIDTH = EDITOR_WIDTH;
 const VIEWPORT_HEIGHT = EDITOR_HEIGHT;
 const BORDER_WIDTH = 4;
@@ -65,18 +68,19 @@ let ratioX = 0;
 let scaledImageWidth = 0;
 let scaledImageHeight = 0;
 
-const drawExportImage = ({renderWidth, renderHeight}) => {
+const drawExportImage = (renderWidth) => {
   const canvas = exportCanvas;
   const context = exportCanvas.getContext('2d');
   context.save();
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  const ratioX = renderWidth / sourceCanvas.width;
+  const ratioX = renderWidth / sourceCanvas.width / SCALE;
 
-  // TODO - Landscape works, make PORTRAIT work next!
-  context.drawImage(sourceCanvas, cropData.x / ratioX, ((editorCanvas.height - cropHeight) * 0.5 - cropData.y) / ratioX, cropWidth / ratioX, cropHeight / ratioX, 0, 0, canvas.width, canvas.height);
-
-  // console.log(ratioX, cropData.x / ratioX);
+  if (imgOrientation === ORIENTATION.LANDSCAPE) {
+    context.drawImage(sourceCanvas, cropData.x / ratioX / SCALE, ((editorCanvas.height - cropHeight) * 0.5 - cropData.y) / ratioX / SCALE, cropWidth / ratioX / SCALE, cropHeight / ratioX / SCALE, 0, 0, canvas.width / SCALE, canvas.height / SCALE);
+  } else {
+    context.drawImage(sourceCanvas, ((editorCanvas.width - cropWidth) * 0.5 - cropData.x) / ratioX / SCALE, cropData.y / ratioX / SCALE, cropWidth / ratioX / SCALE, cropHeight / ratioX / SCALE, 0, 0, canvas.width / SCALE, canvas.height / SCALE);
+  }
 
   context.restore();
 }
@@ -99,8 +103,8 @@ const drawEditorImage = () => {
     renderWidth = renderHeight / sourceHeight * sourceWidth;
   }
 
-  const editorCenterPosX = editorWidth * 0.5 - renderWidth * 0.5;
-  const editorCenterPosY = editorHeight * 0.5 - renderHeight * 0.5;
+  const editorCenterPosX = (editorWidth - renderWidth) * 0.5;
+  const editorCenterPosY = (editorHeight - renderHeight) * 0.5;
   
   context.save();
   context.clearRect(0, 0, editorWidth, editorHeight);
@@ -111,18 +115,18 @@ const drawEditorImage = () => {
 
   // Draw border around the image
   context.fillStyle = BORDER_COLOUR;
-  const borderBoxWidth = renderWidth / CANVAS_SCALE + BORDER_WIDTH * 2 / CANVAS_SCALE;
-  const borderBoxHeight = renderHeight / CANVAS_SCALE + BORDER_WIDTH * 2 / CANVAS_SCALE;
-  context.fillRect(editorCenterPosX - BORDER_WIDTH / CANVAS_SCALE, editorCenterPosY - BORDER_WIDTH / CANVAS_SCALE, borderBoxWidth / CANVAS_SCALE, borderBoxHeight / CANVAS_SCALE);
+  const borderBoxWidth = renderWidth + BORDER_WIDTH * 2;
+  const borderBoxHeight = renderHeight + BORDER_WIDTH * 2;
+  context.fillRect(editorCenterPosX / SCALE - BORDER_WIDTH / SCALE, editorCenterPosY / SCALE - BORDER_WIDTH / SCALE, borderBoxWidth / SCALE, borderBoxHeight / SCALE);
 
   // Draw image
-  context.drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, editorCenterPosX / CANVAS_SCALE, editorCenterPosY / CANVAS_SCALE, renderWidth / CANVAS_SCALE, renderHeight / CANVAS_SCALE);
+  context.drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, editorCenterPosX / SCALE, editorCenterPosY / SCALE, renderWidth / SCALE, renderHeight / SCALE);
 
   drawCropArea({renderWidth, renderHeight, offsetX: dragOffsetX, offsetY: dragOffsetY});
 
   context.restore();
 
-  drawExportImage({renderWidth, renderHeight});
+  drawExportImage(renderWidth);
 };
 
 const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => {
@@ -132,8 +136,8 @@ const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => 
   cropWidth = imgOrientation === ORIENTATION.LANDSCAPE ? renderHeight * ASPECT_RATIO : renderWidth;
   cropHeight = cropWidth / ASPECT_RATIO;
   if (cachedCropPosX < 0 && cachedCropPosY < 0) {
-    cachedCropPosX = canvas.width * 0.5 - cropWidth * 0.5;
-    cachedCropPosY = canvas.height * 0.5 - cropHeight * 0.5;
+    cachedCropPosX = (canvas.width - cropWidth) * 0.5;
+    cachedCropPosY = (canvas.height - cropHeight) * 0.5;
   }
 
   // Lock the crop area within the image boundaries
@@ -164,14 +168,18 @@ const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => 
 
   context.strokeStyle = CROP_AREA_COLOUR;
   context.lineWidth = CROP_BORDER_WIDTH;
-  context.strokeRect(cropData.x, cropData.y, cropData.width, cropData.height);
+  context.shadowOffsetX = 2;
+  context.shadowOffsetY = 2;
+  context.shadowBlur = 4;
+  context.shadowColor = 'rgba(21, 24, 50, 0.3)';
+  context.strokeRect(cropData.x / SCALE, cropData.y / SCALE, cropData.width / SCALE, cropData.height / SCALE);
 
   // Draw crop corners
   context.fillStyle = CROP_AREA_COLOUR;
-  context.fillRect(cropData.x - CROP_CORNER_SIZE * 0.5, cropData.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-  context.fillRect(cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5, cropData.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-  context.fillRect(cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5, cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-  context.fillRect(cropData.x - CROP_CORNER_SIZE * 0.5, cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.x / SCALE - CROP_CORNER_SIZE * 0.5, cropData.y / SCALE - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.x / SCALE + cropData.width / SCALE - CROP_CORNER_SIZE * 0.5, cropData.y / SCALE - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.x / SCALE + cropData.width / SCALE - CROP_CORNER_SIZE * 0.5, cropData.y / SCALE + cropData.height / SCALE - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.x / SCALE - CROP_CORNER_SIZE * 0.5, cropData.y / SCALE + cropData.height / SCALE - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
 }
 
 const drawSourceImage = () => {
@@ -181,12 +189,12 @@ const drawSourceImage = () => {
   context.save();
   context.clearRect(0, 0, canvas.width, canvas.height);
   
-  context.translate(canvas.width / CANVAS_SCALE * 0.5, canvas.height / CANVAS_SCALE * 0.5);
+  context.translate(canvas.width / SCALE * 0.5, canvas.height / SCALE * 0.5);
   context.rotate(Math.PI/2 * rotationCounter);
   
   let logicalWidth = rotationCounter%2 === 0 ? canvas.width : canvas.height;
   let logicalHeight = logicalWidth === canvas.width ? canvas.height : canvas.width;
-  context.drawImage(img, logicalWidth / CANVAS_SCALE * -0.5, logicalHeight / CANVAS_SCALE * -0.5, logicalWidth / CANVAS_SCALE, logicalHeight / CANVAS_SCALE);
+  context.drawImage(img, logicalWidth / SCALE * -0.5, logicalHeight / SCALE * -0.5, logicalWidth / SCALE, logicalHeight / SCALE);
   context.restore();
 };
 
@@ -201,7 +209,6 @@ const setCanvasSize = (canvas, width, height, scale) => {
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.getContext('2d').scale(scale, scale);
-  console.log(scale);
 };
 
 const resizeCanvases = () => {  
@@ -210,21 +217,21 @@ const resizeCanvases = () => {
     logicalWidth === img.naturalWidth ? img.naturalHeight : img.naturalWidth;
   ratioX = VIEWPORT_WIDTH / img.naturalWidth;
 
-  setCanvasSize(sourceCanvas, logicalWidth / CANVAS_SCALE, logicalHeight / CANVAS_SCALE, CANVAS_SCALE);
+  setCanvasSize(sourceCanvas, logicalWidth / SCALE, logicalHeight / SCALE, SCALE);
   setCanvasSize(
     editorCanvas,
     VIEWPORT_WIDTH,
     VIEWPORT_HEIGHT,
-    CANVAS_SCALE
+    SCALE
   );
   setCanvasSize(
     exportCanvas,
     VIEWPORT_WIDTH,
     VIEWPORT_HEIGHT,
-    CANVAS_SCALE
+    SCALE
   );
 
-  if (logicalWidth / CANVAS_SCALE < VIEWPORT_WIDTH || logicalHeight / CANVAS_SCALE < VIEWPORT_HEIGHT) {
+  if (logicalWidth / SCALE < VIEWPORT_WIDTH || logicalHeight / SCALE < VIEWPORT_HEIGHT) {
     showSizeStatus(true);
   } else {
     showSizeStatus();
@@ -267,7 +274,7 @@ const setupButtons = () => {
   });
 
   saveButton.addEventListener('click', () => {
-    const imageData = exportCanvas.toDataURL();
+    const imageData = exportCanvas.toDataURL('image/jpeg', 0.2);
     navigator.clipboard.writeText(imageData);
     console.info('Check clipboard for image data');
   });
@@ -313,9 +320,17 @@ const onMouseMove = (e) => {
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
+  const halfCornerSize = CROP_CORNER_SIZE * 0.5;
+  const scaledCropData = {
+    x: cropData.x / SCALE,
+    y: cropData.y / SCALE,
+    width: cropData.width / SCALE,
+    height: cropData.height / SCALE,
+  };
+
   // Hit detection - main area = MOVE
   if (!cropDragging) {
-    if (x >= cropData.x && x <= cropData.x + cropData.width && y >= cropData.y && y <= cropData.y + cropData.height) {
+    if (x >= scaledCropData.x && x <= scaledCropData.x + scaledCropData.width && y >= scaledCropData.y && y <= scaledCropData.y + scaledCropData.height) {
       setCursor(editorCanvas, 'move');
     } else {
       setCursor(editorCanvas, 'default');
@@ -323,13 +338,13 @@ const onMouseMove = (e) => {
 
     // Corner detection
     activeCropCorner = '';
-    if (x >= cropData.x - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + CROP_CORNER_SIZE * 0.5 && y >= cropData.y - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + CROP_CORNER_SIZE * 0.5) {
+    if (x >= scaledCropData.x - halfCornerSize && x <= scaledCropData.x + halfCornerSize && y >= scaledCropData.y - halfCornerSize && y <= scaledCropData.y + halfCornerSize) {
       activeCropCorner = CORNER.TOP_LEFT;
-    } else if (x >= cropData.x - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + CROP_CORNER_SIZE * 0.5 && y >= cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + cropData.height + CROP_CORNER_SIZE * 0.5) {
+    } else if (x >= scaledCropData.x - halfCornerSize && x <= scaledCropData.x + halfCornerSize && y >= scaledCropData.y + scaledCropData.height - halfCornerSize && y <= scaledCropData.y + scaledCropData.height + halfCornerSize) {
       activeCropCorner = CORNER.BOTTOM_LEFT;
-    } else if (x >= cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + cropData.width + CROP_CORNER_SIZE * 0.5 && y >= cropData.y - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + CROP_CORNER_SIZE * 0.5) {
+    } else if (x >= scaledCropData.x + scaledCropData.width - halfCornerSize && x <= scaledCropData.x + scaledCropData.width + halfCornerSize && y >= scaledCropData.y - halfCornerSize && y <= scaledCropData.y + halfCornerSize) {
       activeCropCorner = CORNER.TOP_RIGHT;
-    } else if (x >= cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + cropData.width + CROP_CORNER_SIZE * 0.5 && y >= cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + cropData.height + CROP_CORNER_SIZE * 0.5) {
+    } else if (x >= scaledCropData.x + scaledCropData.width - halfCornerSize && x <= scaledCropData.x + scaledCropData.width + halfCornerSize && y >= scaledCropData.y + scaledCropData.height - halfCornerSize && y <= scaledCropData.y + scaledCropData.height + halfCornerSize) {
       activeCropCorner = CORNER.BOTTOM_RIGHT;
     }
 
@@ -337,8 +352,8 @@ const onMouseMove = (e) => {
       setCursor(editorCanvas, 'grab');
     }
   } else {
-    dragPosX = x;
-    dragPosY = y;
+    dragPosX = e.clientX * SCALE - rect.left;
+    dragPosY = e.clientY * SCALE - rect.top;
 
     if (!activeCropCorner) {
       if (dragStartPosX < 0 && dragStartPosY < 0) {
@@ -384,13 +399,13 @@ const init = () => {
     editorCanvas,
     VIEWPORT_WIDTH,
     VIEWPORT_HEIGHT,
-    CANVAS_SCALE
+    SCALE
   );
   setCanvasSize(
     exportCanvas,
     VIEWPORT_WIDTH,
     VIEWPORT_HEIGHT,
-    CANVAS_SCALE
+    SCALE
   );
   setupButtons();
   updateButtons();
