@@ -13,6 +13,10 @@
       background: rgb(255, 0, 0, 5%);
       margin: 1rem 0;
     }
+
+    #photo-editor {
+      user-select: none;
+    }
   </style>
 </head>
 
@@ -24,33 +28,35 @@
   - Enforce minimum width and height 531x413px (green/red status)
   - Export edited image as bytearray
 -->
-
-  <div>
-    <label for="photo-upload">Upload photo</label>
-    <input type="file" name="photo-upload" id="photo-upload" accept=".jpg,.png,.webp,.jpeg,.gif" />
-  </div>
-  <br/>
-  <hr/>
-  <div id="status-message">...</div>
-  <hr/>
-  <br />
-  <div>
-    <button type="button" id="rotate-button">Rotate 90 deg</button>
-    <button type="button" id="reset-button">Reset</button>
-    <button type="button" id="save-button">Save image</button>
-  </div>
-  <hr/>
-  <div>
-    <canvas id="editor-canvas"></canvas>
+  <div id="photo-editor">
+    <div>
+      <label for="photo-upload">Upload photo</label>
+      <input type="file" name="photo-upload" id="photo-upload" accept=".jpg,.png,.webp,.jpeg,.gif" />
+    </div>
     <br/>
-    <hr />
-    <button type="button" id="toggle-source-button">Toggle source</button>
-    <div id="source-image" style="display: none;">
-      <h2>Source image</h2>
-      <canvas id="source-canvas"></canvas>
-      <div>
-        <h3>Source image details</h3>
-        <span id="source-image-details">...</span>
+    <hr/>
+    <div id="status-message">...</div>
+    <hr/>
+    <br />
+    <div>
+      <button type="button" id="rotate-button">Rotate 90 deg</button>
+      <button type="button" id="reset-button">Reset</button>
+      <button type="button" id="save-button">Save image</button>
+    </div>
+    <hr/>
+    <div>
+      <canvas id="editor-canvas"></canvas>
+      <canvas id="export-canvas"></canvas>
+      <br/>
+      <hr />
+      <button type="button" id="toggle-source-button">Toggle source</button>
+      <div id="source-image" style="display: none;">
+        <h2>Source image</h2>
+        <canvas id="source-canvas"></canvas>
+        <div>
+          <h3>Source image details</h3>
+          <span id="source-image-details">...</span>
+        </div>
       </div>
     </div>
   </div>

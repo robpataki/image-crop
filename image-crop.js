@@ -3,7 +3,7 @@ const ASPECT_RATIO = 0.8;
 const EDITOR_HEIGHT = 375;
 const EDITOR_WIDTH = EDITOR_HEIGHT * ASPECT_RATIO;
 
-const CANVAS_SCALE = 1;
+const CANVAS_SCALE = 1;//window.devicePixelRatio;
 const VIEWPORT_WIDTH = EDITOR_WIDTH;
 const VIEWPORT_HEIGHT = EDITOR_HEIGHT;
 const BORDER_WIDTH = 4;
@@ -12,6 +12,29 @@ const CROP_CORNER_SIZE = 12;
 const BORDER_COLOUR = '#d53880';
 const CROP_AREA_COLOUR = 'lime';
 const EDITOR_BACKGROUND_COLOUR = '#D3F2F1';
+const CORNER = {
+  TOP_LEFT: 'TL',
+  TOP_RIGHT: 'TR',
+  BOTTOM_RIGHT: 'TR',
+  BOTTOM_LEFT: 'TL'
+};
+const ORIENTATION = {
+  LANDSCAPE: 'L',
+  PORTRAIT: 'P'
+};
+let imgOrientation = '';
+let activeCropCorner = '';
+let cropWidth = 0;
+let cropHeight = 0;
+let cropDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let dragPosX = -1;
+let dragPosY = -1;
+let dragStartPosX = -1;
+let dragStartPosY = -1;
+let cachedCropPosX = -1;
+let cachedCropPosY = -1;
 
 // Cache DOM elements
 const statusMessage = document.querySelector('#status-message');
@@ -19,6 +42,7 @@ const sourceImage = document.querySelector('#source-image');
 const sourceCanvas = document.querySelector('#source-canvas');
 const sourceImageDetails = document.querySelector('#source-image-details');
 const editorCanvas = document.querySelector('#editor-canvas');
+const exportCanvas = document.querySelector('#export-canvas');
 const context = editorCanvas.getContext('2d');
 const uploadButton = document.querySelector('#photo-upload');
 const rotateButton = document.querySelector('#rotate-button');
@@ -41,6 +65,22 @@ let ratioX = 0;
 let scaledImageWidth = 0;
 let scaledImageHeight = 0;
 
+const drawExportImage = ({renderWidth, renderHeight}) => {
+  const canvas = exportCanvas;
+  const context = exportCanvas.getContext('2d');
+  context.save();
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  const ratioX = renderWidth / sourceCanvas.width;
+
+  // TODO - Landscape works, make PORTRAIT work next!
+  context.drawImage(sourceCanvas, cropData.x / ratioX, ((editorCanvas.height - cropHeight) * 0.5 - cropData.y) / ratioX, cropWidth / ratioX, cropHeight / ratioX, 0, 0, canvas.width, canvas.height);
+
+  // console.log(ratioX, cropData.x / ratioX);
+
+  context.restore();
+}
+
 const drawEditorImage = () => {
   const canvas = editorCanvas;
   const context = editorCanvas.getContext('2d');
@@ -50,11 +90,11 @@ const drawEditorImage = () => {
   const sourceWidth = sourceCanvas.width;
   const sourceHeight = sourceCanvas.height;
   
-  const imgOrientation = sourceWidth >= sourceHeight ? 'landscape' : 'portrait';
+  imgOrientation = sourceWidth >= sourceHeight ? ORIENTATION.LANDSCAPE : ORIENTATION.PORTRAIT;
 
   let renderWidth = editorWidth;
   let renderHeight = renderWidth * sourceHeight / sourceWidth;
-  if (imgOrientation === 'portrait' && renderHeight >= editorHeight) {
+  if (imgOrientation === ORIENTATION.PORTRAIT && renderHeight >= editorHeight) {
     renderHeight = editorHeight;
     renderWidth = renderHeight / sourceHeight * sourceWidth;
   }
@@ -78,19 +118,53 @@ const drawEditorImage = () => {
   // Draw image
   context.drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, editorCenterPosX / CANVAS_SCALE, editorCenterPosY / CANVAS_SCALE, renderWidth / CANVAS_SCALE, renderHeight / CANVAS_SCALE);
 
-  // Draw crop area
-  const cropWidth = imgOrientation === 'landscape' ? renderHeight * ASPECT_RATIO : renderWidth;
-  const cropHeight = imgOrientation === 'landscape' ? cropWidth / ASPECT_RATIO : cropWidth / ASPECT_RATIO;
+  drawCropArea({renderWidth, renderHeight, offsetX: dragOffsetX, offsetY: dragOffsetY});
+
+  context.restore();
+
+  drawExportImage({renderWidth, renderHeight});
+};
+
+const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => {
+  const canvas = editorCanvas;
+  const context = canvas.getContext('2d');
+
+  cropWidth = imgOrientation === ORIENTATION.LANDSCAPE ? renderHeight * ASPECT_RATIO : renderWidth;
+  cropHeight = cropWidth / ASPECT_RATIO;
+  if (cachedCropPosX < 0 && cachedCropPosY < 0) {
+    cachedCropPosX = canvas.width * 0.5 - cropWidth * 0.5;
+    cachedCropPosY = canvas.height * 0.5 - cropHeight * 0.5;
+  }
+
+  // Lock the crop area within the image boundaries
+  let newCropPosX = cachedCropPosX + offsetX;
+  let newCropPosY = cachedCropPosY + offsetY;
+  if (imgOrientation === ORIENTATION.LANDSCAPE) {
+    if (cachedCropPosX + offsetX > canvas.width - cropWidth && offsetX > 0) {
+      newCropPosX = canvas.width - cropWidth;
+    } else if (cachedCropPosX + offsetX < 0 && offsetX < 0) {
+      newCropPosX = 0;
+    }
+    newCropPosY = canvas.height * 0.5 - cropHeight * 0.5;
+  } else {
+    if (cachedCropPosY + offsetY > canvas.height - cropHeight && offsetY > 0) {
+      newCropPosY = canvas.height - cropHeight;
+    } else if (cachedCropPosY + offsetY < 0 && offsetY < 0) {
+      newCropPosY = 0;
+    }
+    newCropPosX = canvas.width * 0.5 - cropWidth * 0.5;
+  }
+
   cropData = {
-    x: editorWidth * 0.5 - cropWidth * 0.5,
-    y: editorHeight * 0.5 - cropHeight * 0.5,
+    x: newCropPosX,
+    y: newCropPosY,
     width: cropWidth,
     height: cropHeight
   };
 
   context.strokeStyle = CROP_AREA_COLOUR;
   context.lineWidth = CROP_BORDER_WIDTH;
-  context.strokeRect(cropData.x, cropData.y, cropData.width / CANVAS_SCALE, cropData.height / CANVAS_SCALE);
+  context.strokeRect(cropData.x, cropData.y, cropData.width, cropData.height);
 
   // Draw crop corners
   context.fillStyle = CROP_AREA_COLOUR;
@@ -98,9 +172,7 @@ const drawEditorImage = () => {
   context.fillRect(cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5, cropData.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
   context.fillRect(cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5, cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
   context.fillRect(cropData.x - CROP_CORNER_SIZE * 0.5, cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-
-  context.restore();
-};
+}
 
 const drawSourceImage = () => {
   const canvas = sourceCanvas;
@@ -124,11 +196,12 @@ const renderPreviewImage = (file) => {
 };
 
 const setCanvasSize = (canvas, width, height, scale) => {
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = width * scale;
+  canvas.height = height * scale;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.getContext('2d').scale(scale, scale);
+  console.log(scale);
 };
 
 const resizeCanvases = () => {  
@@ -140,6 +213,12 @@ const resizeCanvases = () => {
   setCanvasSize(sourceCanvas, logicalWidth / CANVAS_SCALE, logicalHeight / CANVAS_SCALE, CANVAS_SCALE);
   setCanvasSize(
     editorCanvas,
+    VIEWPORT_WIDTH,
+    VIEWPORT_HEIGHT,
+    CANVAS_SCALE
+  );
+  setCanvasSize(
+    exportCanvas,
     VIEWPORT_WIDTH,
     VIEWPORT_HEIGHT,
     CANVAS_SCALE
@@ -164,6 +243,8 @@ const redrawCanvases = () => {
 
 const onLoadImage = () => {
   rotationCounter = 0;
+  cachedCropPosX = -1;
+  cachedCropPosY = -1;
   updateSourceImageDetails();
   redrawCanvases();
 };
@@ -181,11 +262,12 @@ const setupButtons = () => {
 
   rotateButton.addEventListener('click', () => {
     rotationCounter = rotationCounter < 3 ? ++rotationCounter : 0;
+    resetData();
     redrawCanvases();
   });
 
   saveButton.addEventListener('click', () => {
-    const imageData = editorCanvas.toDataURL();
+    const imageData = exportCanvas.toDataURL();
     navigator.clipboard.writeText(imageData);
     console.info('Check clipboard for image data');
   });
@@ -196,9 +278,18 @@ const setupButtons = () => {
 
   resetButton.addEventListener('click', () => {
     rotationCounter = 0;
+    resetData();
     redrawCanvases();
   });
 };
+
+const resetData = () => {
+  cachedCropPosX = -1;
+  cachedCropPosY = -1;
+  imgOrientation = '';
+  cropWidth = 0;
+  cropHeight = 0;
+}
 
 const updateSourceImageDetails = () => {
   sourceImageDetails.innerHTML = `Width: ${img.naturalWidth}px`;
@@ -223,11 +314,69 @@ const onMouseMove = (e) => {
   const y = e.clientY - rect.top;
 
   // Hit detection - main area = MOVE
-  if (x >= cropData.x && x <= cropData.x + cropData.width && y >= cropData.y && y <= cropData.y + cropData.height) {
-    setCursor(editorCanvas, 'move');
+  if (!cropDragging) {
+    if (x >= cropData.x && x <= cropData.x + cropData.width && y >= cropData.y && y <= cropData.y + cropData.height) {
+      setCursor(editorCanvas, 'move');
+    } else {
+      setCursor(editorCanvas, 'default');
+    }
+
+    // Corner detection
+    activeCropCorner = '';
+    if (x >= cropData.x - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + CROP_CORNER_SIZE * 0.5 && y >= cropData.y - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + CROP_CORNER_SIZE * 0.5) {
+      activeCropCorner = CORNER.TOP_LEFT;
+    } else if (x >= cropData.x - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + CROP_CORNER_SIZE * 0.5 && y >= cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + cropData.height + CROP_CORNER_SIZE * 0.5) {
+      activeCropCorner = CORNER.BOTTOM_LEFT;
+    } else if (x >= cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + cropData.width + CROP_CORNER_SIZE * 0.5 && y >= cropData.y - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + CROP_CORNER_SIZE * 0.5) {
+      activeCropCorner = CORNER.TOP_RIGHT;
+    } else if (x >= cropData.x + cropData.width - CROP_CORNER_SIZE * 0.5 && x <= cropData.x + cropData.width + CROP_CORNER_SIZE * 0.5 && y >= cropData.y + cropData.height - CROP_CORNER_SIZE * 0.5 && y <= cropData.y + cropData.height + CROP_CORNER_SIZE * 0.5) {
+      activeCropCorner = CORNER.BOTTOM_RIGHT;
+    }
+
+    if (activeCropCorner) {
+      setCursor(editorCanvas, 'grab');
+    }
   } else {
-    setCursor(editorCanvas, 'default');
+    dragPosX = x;
+    dragPosY = y;
+
+    if (!activeCropCorner) {
+      if (dragStartPosX < 0 && dragStartPosY < 0) {
+        dragStartPosX = dragPosX;
+        dragStartPosY = dragPosY;
+      }
+
+      dragOffsetX = dragPosX - dragStartPosX;
+      dragOffsetY = dragPosY - dragStartPosY;
+    }
+
+    drawEditorImage();
   }
+};
+
+const onMouseDown = (e) => {
+  cropDragging = true;
+  if (activeCropCorner) {
+    setCursor(editorCanvas, 'grabbing');
+  }
+};
+
+const onMouseUp = (e) => {
+  cachedCropPosX = cropData.x;
+  cachedCropPosY = cropData.y;
+  cropDragging = false;
+  dragPosX = -1;
+  dragPosY = -1;
+  dragStartPosX = -1;
+  dragStartPosY = -1;
+  dragOffsetX = 0;
+  dragOffsetY = 0;
+};
+
+initCropAreaInteraction = () => {
+  editorCanvas.addEventListener('mousedown', onMouseDown);
+  editorCanvas.addEventListener('mousemove', onMouseMove);
+  document.body.addEventListener('mouseup', onMouseUp);
 }
 
 const init = () => {
@@ -237,16 +386,16 @@ const init = () => {
     VIEWPORT_HEIGHT,
     CANVAS_SCALE
   );
+  setCanvasSize(
+    exportCanvas,
+    VIEWPORT_WIDTH,
+    VIEWPORT_HEIGHT,
+    CANVAS_SCALE
+  );
   setupButtons();
   updateButtons();
 
-  editorCanvas.addEventListener('mouseenter', () => {
-    editorCanvas.addEventListener('mousemove', onMouseMove);
-  });
-
-  editorCanvas.addEventListener('mouseleave', () => {
-    editorCanvas.removeEventListener('mousemove', onMouseMove);
-  });
+  initCropAreaInteraction();
 };
 
 const setCursor = (el, cursorStyle = 'default') => {
