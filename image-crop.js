@@ -1,7 +1,7 @@
 // TODO - Make Crop area resizable
 // TODO - Determine and lock to minimum crop area
 
-const ASPECT_RATIO = 35/45; //7:9
+const ASPECT_RATIO = 35/45;
 const EDITOR_HEIGHT = 375;
 const EDITOR_WIDTH = EDITOR_HEIGHT * ASPECT_RATIO;
 
@@ -123,18 +123,18 @@ const drawEditorImage = () => {
   // Draw image
   context.drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, editorCenterPosX / SCALE, editorCenterPosY / SCALE, renderWidth / SCALE, renderHeight / SCALE);
 
-  drawCropArea({renderWidth, renderHeight, offsetX: dragOffsetX, offsetY: dragOffsetY});
+  drawCropArea({width: renderWidth, height: renderHeight, offsetX: dragOffsetX, offsetY: dragOffsetY});
 
   context.restore();
 
   drawExportImage(renderWidth);
 };
 
-const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => {
+const drawCropArea = ({width, height, offsetX = 0, offsetY = 0}) => {
   const canvas = editorCanvas;
   const context = canvas.getContext('2d');
 
-  cropWidth = imgOrientation === ORIENTATION.LANDSCAPE ? renderHeight * ASPECT_RATIO : renderWidth;
+  cropWidth = imgOrientation === ORIENTATION.LANDSCAPE ? height * ASPECT_RATIO : width;
   cropHeight = cropWidth / ASPECT_RATIO;
   if (cachedCropPosX < 0 && cachedCropPosY < 0) {
     cachedCropPosX = (canvas.width - cropWidth) * 0.5;
@@ -365,15 +365,13 @@ const onMouseMove = (e) => {
     dragPosX = e.clientX * SCALE - rect.left;
     dragPosY = e.clientY * SCALE - rect.top;
 
-    if (!activeCropCorner) {
-      if (dragStartPosX < 0 && dragStartPosY < 0) {
-        dragStartPosX = dragPosX;
-        dragStartPosY = dragPosY;
-      }
-
-      dragOffsetX = dragPosX - dragStartPosX;
-      dragOffsetY = dragPosY - dragStartPosY;
+    if (dragStartPosX < 0 && dragStartPosY < 0) {
+      dragStartPosX = dragPosX;
+      dragStartPosY = dragPosY;
     }
+
+    dragOffsetX = dragPosX - dragStartPosX;
+    dragOffsetY = dragPosY - dragStartPosY;
 
     drawEditorImage();
   }
@@ -442,7 +440,12 @@ const setCursor = (el, cursorStyle = 'default') => {
 
 const render = () => {
   if (hasSource) {
-    debug(`activeCropCorner: "${activeCropCorner}"\ncropDragging: ${cropDragging}\ncropAreaActive: ${cropAreaActive}`);
+    let debugText = `Crop area active: ${cropAreaActive}`;
+    debugText += `\nActive corner: "${activeCropCorner}"`;
+    debugText += `\nDragging: ${cropDragging}`;
+    debugText += `\nDrag offset: ${dragOffsetX}/${dragOffsetY}`;
+    debug(debugText);
+
   }
 
   requestAnimationFrame(render);
