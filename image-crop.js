@@ -9,7 +9,7 @@ const SCALE = window.devicePixelRatio;
 const VIEWPORT_WIDTH = EDITOR_WIDTH;
 const VIEWPORT_HEIGHT = EDITOR_HEIGHT;
 const BORDER_WIDTH = 2;
-const CROP_BORDER_WIDTH = 3;
+const CROP_BORDER_WIDTH = 2;
 const CROP_CORNER_SIZE = 10;
 const BORDER_COLOUR = '#b1b4b6';
 const CROP_AREA_COLOUR = '#ffdd00';
@@ -17,8 +17,8 @@ const EDITOR_BACKGROUND_COLOUR = '#ffffff';
 const CORNER = {
   TOP_LEFT: 'TL',
   TOP_RIGHT: 'TR',
-  BOTTOM_RIGHT: 'TR',
-  BOTTOM_LEFT: 'TL'
+  BOTTOM_RIGHT: 'BR',
+  BOTTOM_LEFT: 'BL'
 };
 const ORIENTATION = {
   LANDSCAPE: 'L',
@@ -52,6 +52,7 @@ const rotateButton = document.querySelector('#rotate-button');
 const resetButton = document.querySelector('#reset-button');
 const toggleSourceButton = document.querySelector('#toggle-source-button');
 const saveButton = document.querySelector('#save-button');
+const debugLog = document.querySelector('#debug-log');
 
 let cropData = {
   x: -1,
@@ -167,6 +168,7 @@ const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => 
   };
 
   context.strokeStyle = CROP_AREA_COLOUR;
+  context.setLineDash([4, 2]);
   context.lineWidth = CROP_BORDER_WIDTH;
   context.shadowOffsetX = 0;
   context.shadowOffsetY = 0;
@@ -353,10 +355,8 @@ const checkCropAreaActivity = (e) => {
 
 const onMouseMove = (e) => {
   checkCropAreaActivity(e);
-
   const rect = e.target.getBoundingClientRect();
-
-  // Hit detection - main area = MOVE
+  
   if (!cropDragging) {
     if (activeCropCorner) {
       setCursor(editorCanvas, 'grab');
@@ -385,26 +385,19 @@ const onMouseDown = (e) => {
   if (hasSource) {
     if (activeCropCorner || cropAreaActive) {
       cropDragging = true;
-      setCursor(editorCanvas, 'grabbing');
+
+      if (activeCropCorner) {
+        setCursor(editorCanvas, 'grabbing');
+      }
     }
   }
 };
 
 const onMouseUp = (e) => {
+  cropDragging = false;
+  
   checkCropAreaActivity(e);
 
-  if (hasSource) {
-    if (!cropAreaActive && !cropDragging) {
-      setCursor(editorCanvas, 'default');
-    } else if (cropAreaActive) {
-      setCursor(editorCanvas, 'move');
-    } else if (activeCropCorner) {
-      setCursor(editorCanvas, 'grab');
-    }
-  }
-
-  cropAreaActive = false;
-  cropDragging = false;
   cachedCropPosX = cropData.x;
   cachedCropPosY = cropData.y;
   dragPosX = -1;
@@ -438,12 +431,26 @@ const init = () => {
   updateButtons();
 
   initCropAreaInteraction();
+  render();
 };
 
 const setCursor = (el, cursorStyle = 'default') => {
   if (el && typeof el.style !== 'undefined') {
     el.style.cursor = cursorStyle;
   }
-}
+};
+
+const render = () => {
+  if (hasSource) {
+    debug(`activeCropCorner: "${activeCropCorner}"\ncropDragging: ${cropDragging}\ncropAreaActive: ${cropAreaActive}`);
+  }
+
+  requestAnimationFrame(render);
+};
+
+const debug = (text) => {
+  debugLog.innerHTML = `\n${text}`;
+  debugLog.scrollTop = debugLog.scrollHeight;
+};
 
 init();
