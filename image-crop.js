@@ -1,4 +1,3 @@
-// TODO - Render with SCALE
 // TODO - Make Crop area resizable
 // TODO - Determine and lock to minimum crop area
 
@@ -9,12 +8,12 @@ const EDITOR_WIDTH = EDITOR_HEIGHT * ASPECT_RATIO;
 const SCALE = window.devicePixelRatio;
 const VIEWPORT_WIDTH = EDITOR_WIDTH;
 const VIEWPORT_HEIGHT = EDITOR_HEIGHT;
-const BORDER_WIDTH = 4;
-const CROP_BORDER_WIDTH = 4;
-const CROP_CORNER_SIZE = 12;
-const BORDER_COLOUR = '#d53880';
-const CROP_AREA_COLOUR = 'lime';
-const EDITOR_BACKGROUND_COLOUR = '#D3F2F1';
+const BORDER_WIDTH = 2;
+const CROP_BORDER_WIDTH = 3;
+const CROP_CORNER_SIZE = 10;
+const BORDER_COLOUR = '#b1b4b6';
+const CROP_AREA_COLOUR = '#ffdd00';
+const EDITOR_BACKGROUND_COLOUR = '#ffffff';
 const CORNER = {
   TOP_LEFT: 'TL',
   TOP_RIGHT: 'TR',
@@ -30,6 +29,7 @@ let activeCropCorner = '';
 let cropWidth = 0;
 let cropHeight = 0;
 let cropDragging = false;
+let cropAreaActive = false;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
 let dragPosX = -1;
@@ -168,10 +168,10 @@ const drawCropArea = ({renderWidth, renderHeight, offsetX = 0, offsetY = 0}) => 
 
   context.strokeStyle = CROP_AREA_COLOUR;
   context.lineWidth = CROP_BORDER_WIDTH;
-  context.shadowOffsetX = 2;
-  context.shadowOffsetY = 2;
-  context.shadowBlur = 4;
-  context.shadowColor = 'rgba(21, 24, 50, 0.3)';
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+  context.shadowBlur = 2;
+  context.shadowColor = '	#0b0c0c';
   context.strokeRect(cropData.x / SCALE, cropData.y / SCALE, cropData.width / SCALE, cropData.height / SCALE);
 
   // Draw crop corners
@@ -315,7 +315,7 @@ const updateButtons = () => {
   }
 };
 
-const onMouseMove = (e) => {
+const checkCropAreaActivity = (e) => {
   const rect = e.target.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -328,12 +328,13 @@ const onMouseMove = (e) => {
     height: cropData.height / SCALE,
   };
 
-  // Hit detection - main area = MOVE
   if (!cropDragging) {
     if (x >= scaledCropData.x && x <= scaledCropData.x + scaledCropData.width && y >= scaledCropData.y && y <= scaledCropData.y + scaledCropData.height) {
       setCursor(editorCanvas, 'move');
+      cropAreaActive = true;
     } else {
       setCursor(editorCanvas, 'default');
+      cropAreaActive = false;
     }
 
     // Corner detection
@@ -347,7 +348,16 @@ const onMouseMove = (e) => {
     } else if (x >= scaledCropData.x + scaledCropData.width - halfCornerSize && x <= scaledCropData.x + scaledCropData.width + halfCornerSize && y >= scaledCropData.y + scaledCropData.height - halfCornerSize && y <= scaledCropData.y + scaledCropData.height + halfCornerSize) {
       activeCropCorner = CORNER.BOTTOM_RIGHT;
     }
+  }
+};
 
+const onMouseMove = (e) => {
+  checkCropAreaActivity(e);
+
+  const rect = e.target.getBoundingClientRect();
+
+  // Hit detection - main area = MOVE
+  if (!cropDragging) {
     if (activeCropCorner) {
       setCursor(editorCanvas, 'grab');
     }
@@ -370,16 +380,33 @@ const onMouseMove = (e) => {
 };
 
 const onMouseDown = (e) => {
-  cropDragging = true;
-  if (activeCropCorner) {
-    setCursor(editorCanvas, 'grabbing');
+  checkCropAreaActivity(e);
+
+  if (hasSource) {
+    if (activeCropCorner || cropAreaActive) {
+      cropDragging = true;
+      setCursor(editorCanvas, 'grabbing');
+    }
   }
 };
 
 const onMouseUp = (e) => {
+  checkCropAreaActivity(e);
+
+  if (hasSource) {
+    if (!cropAreaActive && !cropDragging) {
+      setCursor(editorCanvas, 'default');
+    } else if (cropAreaActive) {
+      setCursor(editorCanvas, 'move');
+    } else if (activeCropCorner) {
+      setCursor(editorCanvas, 'grab');
+    }
+  }
+
+  cropAreaActive = false;
+  cropDragging = false;
   cachedCropPosX = cropData.x;
   cachedCropPosY = cropData.y;
-  cropDragging = false;
   dragPosX = -1;
   dragPosY = -1;
   dragStartPosX = -1;
