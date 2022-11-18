@@ -1,10 +1,12 @@
 // TODO - Set minimum crop dimensions based on source and export image dimensions
 // TODO - Display if source photo meets the print dimensions
 
+const DEBUG = false;
+
 const ASPECT_RATIO = 35/45; // Use the printed passport photo size in mm
-const PRINT_WIDTH = 1720; // in pixels
+const PRINT_WIDTH = 430; // in pixels
 const PRINT_HEIGHT = Math.round(PRINT_WIDTH / ASPECT_RATIO); // in pixels
-const EDITOR_WIDTH = 420 // in pixels
+const EDITOR_WIDTH = 400 // in pixels
 const EDITOR_HEIGHT = EDITOR_WIDTH / ASPECT_RATIO;// in pixels
 
 const SCALE = window.devicePixelRatio;
@@ -12,9 +14,9 @@ const VIEWPORT_WIDTH = EDITOR_WIDTH;
 const VIEWPORT_HEIGHT = EDITOR_HEIGHT;
 const BORDER_WIDTH = 4;
 const CROP_BORDER_WIDTH = 2;
-const CROP_CORNER_SIZE = 8;
+const CROP_CORNER_SIZE = 10;
 const BORDER_COLOUR = '#b1b4b6';
-const CROP_AREA_COLOUR = '#ffffff';
+const CROP_AREA_COLOUR = '#ffdd00';
 const ANCHOR_POINT_COLOUR = 'lime';
 const EDITOR_BACKGROUND_COLOUR = '#ffffff';
 const EDITOR_OVERLAY_COLOUR = 'rgb(0, 0, 0, 50%)';
@@ -161,7 +163,7 @@ const drawExportImage = (renderWidth, renderHeight) => {
   context.save();
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  context.drawImage(sourceCanvas, cropOffsetX / imageRatioX, cropOffsetY / imageRatioX, cropData.scaled.width / imageRatioX, cropData.scaled.height / imageRatioX, 0, 0, canvas.width, canvas.height);
+  context.drawImage(sourceCanvas, cropOffsetX / imageRatioX, cropOffsetY / imageRatioX, cropData.width / imageRatioX, cropData.height / imageRatioX, 0, 0, canvas.width / SCALE, canvas.height / SCALE);
 
   context.restore();
 }
@@ -250,7 +252,7 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
    if (cropDragging) {
      // Resize
      if (activeCropCorner) {
-       cropWidth = activeCropCorner === CORNER.BOTTOM_RIGHT || activeCropCorner === CORNER.TOP_RIGHT ? pointerPos.x - anchorPoint.x : anchorPoint.x - pointerPos.x;
+       cropWidth = activeCropCorner === CORNER.BOTTOM_RIGHT || activeCropCorner === CORNER.TOP_RIGHT ? (pointerPos.x - anchorPoint.x) * SCALE : (anchorPoint.x - pointerPos.x) * SCALE;
        cropHeight = cropWidth / ASPECT_RATIO;
 
       //  Lock width and height to anchor point
@@ -347,14 +349,15 @@ const drawCropArea = () => {
   context.strokeRect(cropData.scaled.x, cropData.scaled.y, cropData.scaled.width, cropData.scaled.height);
 
   // Draw crop corners
-  context.setLineDash([]);
-  context.strokeRect(cropData.scaled.x - CROP_CORNER_SIZE * 0.5, cropData.scaled.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-  context.strokeRect(cropData.scaled.x + cropData.scaled.width - CROP_CORNER_SIZE * 0.5, cropData.scaled.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-  context.strokeRect(cropData.scaled.x + cropData.scaled.width - CROP_CORNER_SIZE * 0.5, cropData.scaled.y + cropData.scaled.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
-  context.strokeRect(cropData.scaled.x - CROP_CORNER_SIZE * 0.5, cropData.scaled.y + cropData.scaled.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  /* context.setLineDash([]); */
+  context.fillStyle = CROP_AREA_COLOUR;
+  context.fillRect(cropData.scaled.x - CROP_CORNER_SIZE * 0.5, cropData.scaled.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.scaled.x + cropData.scaled.width - CROP_CORNER_SIZE * 0.5, cropData.scaled.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.scaled.x + cropData.scaled.width - CROP_CORNER_SIZE * 0.5, cropData.scaled.y + cropData.scaled.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
+  context.fillRect(cropData.scaled.x - CROP_CORNER_SIZE * 0.5, cropData.scaled.y + cropData.scaled.height - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
 
   // Draw the anchor point
-  if (anchorPoint.x >= 0 && anchorPoint.y >= 0) {
+  if (DEBUG && anchorPoint.x >= 0 && anchorPoint.y >= 0) {
     context.strokeStyle = ANCHOR_POINT_COLOUR;
     context.setLineDash([]);
     context.shadowBlur = 0;
@@ -414,7 +417,7 @@ const resizeCanvases = () => {
     SCALE
   );
 
-  if (logicalWidth / SCALE < VIEWPORT_WIDTH || logicalHeight / SCALE < VIEWPORT_HEIGHT) {
+  if (logicalWidth < PRINT_WIDTH || logicalHeight < PRINT_HEIGHT) {
     showSizeStatus(true);
   } else {
     showSizeStatus();
@@ -422,7 +425,7 @@ const resizeCanvases = () => {
 };
 
 const showSizeStatus = (showWarning = false) => {
-  statusMessage.innerHTML = showWarning ? '&#10060; Image is too small for printing' : '&#9989; Size is good';
+  statusMessage.innerHTML = showWarning ? '&#10060; The source image is smaller than the minimum print size' : '&#9989; The source photo can be used to produce the print photo';
 };
 
 const redrawCanvases = () => {
@@ -436,7 +439,6 @@ const onLoadImage = () => {
   rotationCounter = 0;
   cachedCropPosX = -1;
   cachedCropPosY = -1;
-  updateSourceImageDetails();
   redrawCanvases();
 };
 
@@ -498,11 +500,6 @@ const resetData = () => {
   cachedCropPosX = -1;
   cachedCropPosY = -1;
   imgOrientation = '';
-};
-
-const updateSourceImageDetails = () => {
-  sourceImageDetails.innerHTML = `Width: ${img.naturalWidth}px`;
-  sourceImageDetails.innerHTML += `<br/>Height: ${img.naturalHeight}px`;
 };
 
 const updateButtons = () => {
@@ -647,14 +644,19 @@ const setCursor = (el, cursorStyle = 'default') => {
 const render = () => {
   if (hasSource) {
     let debugText = `\nPrint dimensions: ${PRINT_WIDTH}px/${PRINT_HEIGHT}px`;
+    if (imgOrientation === ORIENTATION.LANDSCAPE) {
+      debugText+= `\nSource dimensions: ${img.naturalWidth}px/${img.naturalHeight}px`;
+    } else {
+      debugText+= `\nSource dimensions: ${img.naturalHeight}px/${img.naturalWidth}px`;
+    }
     /* debugText += `\nCrop area active: ${cropAreaActive}`;
     debugText += `\nActive corner: "${activeCropCorner}"`;
     debugText += `\nDragging: ${cropDragging}`; */
     debugText += `\nAnchor point: ${anchorPoint.x.toFixed(2)}/${anchorPoint.y.toFixed(2)}`;
     debugText += `\nCrop TL: ${cropData.x.toFixed(2)}/${cropData.y.toFixed(2)}`;
     /* debugText += `\nDrag offset: ${dragOffsetX}/${dragOffsetY}`; */
-    /* debugText += `\nCrop dimensions: ${(cropData.scaled.width).toFixed(2)}/${(cropData.scaled.height).toFixed(2)}`; */
-    /* debugText += `\nG/A point distance: ${(anchorDistance.width).toFixed(2)}/${(anchorDistance.height).toFixed(2)}`; */
+    debugText += `\nCrop dimensions: ${(cropData.scaled.width).toFixed(2)}/${(cropData.scaled.height).toFixed(2)}`;
+    debugText += `\nG/A point distance: ${(anchorDistance.width).toFixed(2)}/${(anchorDistance.height).toFixed(2)}`;
     /* debugText += `\nCached  pos: ${cachedCropPosX.toFixed(2)}/${cachedCropPosY.toFixed(2)}`; */
     debug(debugText);
   }
