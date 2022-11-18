@@ -1,8 +1,8 @@
+// TODO - Set minimum crop dimensions based on source and export image dimensions
 // TODO - Display if source photo meets the print dimensions
-// TODO - Prevent editor to crop the image smaller than print dimensions
 
 const ASPECT_RATIO = 35/45; // Use the printed passport photo size in mm
-const PRINT_WIDTH = 600; // in pixels
+const PRINT_WIDTH = 1720; // in pixels
 const PRINT_HEIGHT = Math.round(PRINT_WIDTH / ASPECT_RATIO); // in pixels
 const EDITOR_WIDTH = 420 // in pixels
 const EDITOR_HEIGHT = EDITOR_WIDTH / ASPECT_RATIO;// in pixels
@@ -17,6 +17,7 @@ const BORDER_COLOUR = '#b1b4b6';
 const CROP_AREA_COLOUR = '#ffffff';
 const ANCHOR_POINT_COLOUR = 'lime';
 const EDITOR_BACKGROUND_COLOUR = '#ffffff';
+const EDITOR_OVERLAY_COLOUR = 'rgb(0, 0, 0, 50%)';
 const CORNER = {
   TOP_LEFT: 'TL',
   TOP_RIGHT: 'TR',
@@ -64,6 +65,7 @@ let scaledImageWidth = 0;
 let scaledImageHeight = 0;
 
 // Cache DOM elements
+const previewImage = document.querySelector('#preview-image');
 const statusMessage = document.querySelector('#status-message');
 const sourceImage = document.querySelector('#source-image');
 const sourceCanvas = document.querySelector('#source-canvas');
@@ -146,8 +148,6 @@ const getAnchorDistance = () => {
   }
 }
 
-
-
 /* DRAWING FUNCTIONS */
 const drawExportImage = (renderWidth, renderHeight) => {
   const canvas = exportCanvas;
@@ -160,7 +160,7 @@ const drawExportImage = (renderWidth, renderHeight) => {
 
   context.save();
   context.clearRect(0, 0, canvas.width, canvas.height);
-  
+
   context.drawImage(sourceCanvas, cropOffsetX / imageRatioX, cropOffsetY / imageRatioX, cropData.scaled.width / imageRatioX, cropData.scaled.height / imageRatioX, 0, 0, canvas.width, canvas.height);
 
   context.restore();
@@ -204,7 +204,7 @@ const drawEditorImage = () => {
   context.drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, editorCenterPosX / SCALE, editorCenterPosY / SCALE, renderWidth / SCALE, renderHeight / SCALE);
 
   // Draw dark overlay
-  context.fillStyle = 'rgba(0, 0, 0, 60%)';
+  context.fillStyle = EDITOR_OVERLAY_COLOUR;
   context.fillRect(editorCenterPosX / SCALE, editorCenterPosY / SCALE, renderWidth / SCALE, renderHeight / SCALE);
 
   // Cache crop area maths
@@ -229,7 +229,6 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
   const maxWidth = imgOrientation === ORIENTATION.LANDSCAPE ? imageHeight * ASPECT_RATIO : imageWidth;
   const maxHeight = maxWidth / ASPECT_RATIO;
 
-   // TODO
    const minWidth = 100;
    const minHeight = minWidth / ASPECT_RATIO;
  
@@ -238,6 +237,8 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
      cachedCropPosX = (canvas.width - maxWidth) * 0.5;
      cachedCropPosY = (canvas.height - maxHeight) * 0.5;
    }
+   
+   // Default position
    let newCropPosX = cachedCropPosX;
    let newCropPosY = cachedCropPosY;
  
@@ -252,12 +253,18 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
        cropWidth = activeCropCorner === CORNER.BOTTOM_RIGHT || activeCropCorner === CORNER.TOP_RIGHT ? pointerPos.x - anchorPoint.x : anchorPoint.x - pointerPos.x;
        cropHeight = cropWidth / ASPECT_RATIO;
 
-       // Make sure we don't bleed through the horizontal and vertical edges
-       if (imgOrientation === ORIENTATION.LANDSCAPE) {
-
-       } else {
-
-       }
+      //  Lock width and height to anchor point
+      /* if (activeCropCorner === CORNER.BOTTOM_LEFT || activeCropCorner === CORNER.BOTTOM_RIGHT) {
+        if (anchorPoint.y - (canvas.height - maxHeight) * 0.5 + cropHeight >= maxHeight) {
+          cropHeight = maxHeight - (anchorPoint.y - (canvas.height - maxHeight) * 0.5);
+          cropWidth = cropHeight * ASPECT_RATIO;
+        }
+      } else {
+        if (anchorPoint.y - (canvas.height - maxHeight) * 0.5 - cropHeight <= 0) { 
+          cropHeight = anchorPoint.y - (canvas.height - maxHeight) * 0.5;
+          cropWidth = cropHeight * ASPECT_RATIO;
+        }
+      } */
  
        // Enforce min/max crop dimensions
        if (cropWidth >= maxWidth || cropHeight >= maxHeight) {
@@ -292,16 +299,22 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
        newCropPosY = cachedCropPosY + dragOffsetY;
      }
 
+
+    const canvasTopEdge = (canvas.height - imageHeight) * 0.5;
+    const canvasLeftEdge = (canvas.width - imageWidth) * 0.5;
+    const canvasBottomEdge = (canvas.height + imageHeight) * 0.5;
+    const canvasRightEdge = (canvas.width + imageWidth) * 0.5;
+
      // Lock the sizing within the vertical boundaries
-     if (newCropPosY <= (canvas.height - imageHeight) * 0.5) {
-      newCropPosY = (canvas.height - imageHeight) * 0.5;
-     } else if (newCropPosY >= (canvas.height + imageHeight) * 0.5 - cropHeight) {
-      newCropPosY = (canvas.height + imageHeight) * 0.5 - cropHeight;
+     if (newCropPosY <= canvasTopEdge) {
+      newCropPosY = canvasTopEdge;
+     } else if (newCropPosY >= canvasBottomEdge - cropHeight) {
+      newCropPosY = canvasBottomEdge - cropHeight;
      }
-     if (newCropPosX <= (canvas.width - imageWidth) * 0.5) {
-      newCropPosX = (canvas.width - imageWidth) * 0.5;
-     } else if (newCropPosX >= (canvas.width + imageWidth) * 0.5 - cropWidth) {
-      newCropPosX = (canvas.width + imageWidth) * 0.5 - cropWidth;
+     if (newCropPosX <= canvasLeftEdge) {
+      newCropPosX = canvasLeftEdge;
+     } else if (newCropPosX >= canvasRightEdge - cropWidth) {
+      newCropPosX = canvasRightEdge - cropWidth;
      }
    }
    
@@ -445,8 +458,8 @@ const setupButtons = () => {
   });
 
   saveButton.addEventListener('click', () => {
-    const imageData = exportCanvas.toDataURL('image/jpeg', 0.2);
-    navigator.clipboard.writeText(imageData);
+    const imageData = exportCanvas.toDataURL('image/jpeg', 1);
+    setPreviewImage(imageData);
     console.info('Check clipboard for image data');
   });
 
@@ -461,7 +474,13 @@ const setupButtons = () => {
   });
 };
 
+const setPreviewImage = (imageSource) => {
+  previewImage.setAttribute('src', imageSource);
+  previewImage.style.display = 'block';
+}
+
 const resetData = () => {
+  previewImage.style.display = 'none';
   anchorPoint = getAnchorPoint();
   anchorDistance = getAnchorDistance();
   cropData = {
@@ -631,11 +650,12 @@ const render = () => {
     /* debugText += `\nCrop area active: ${cropAreaActive}`;
     debugText += `\nActive corner: "${activeCropCorner}"`;
     debugText += `\nDragging: ${cropDragging}`; */
-    debugText += `\nDrag offset: ${dragOffsetX}/${dragOffsetY}`;
     debugText += `\nAnchor point: ${anchorPoint.x.toFixed(2)}/${anchorPoint.y.toFixed(2)}`;
-    debugText += `\nCrop dimensions: ${(cropData.scaled.width).toFixed(2)}/${(cropData.scaled.height).toFixed(2)}`;
-    debugText += `\nG/A point distance: ${(anchorDistance.width).toFixed(2)}/${(anchorDistance.height).toFixed(2)}`;
-    debugText += `\nCached  pos: ${cachedCropPosX.toFixed(2)}/${cachedCropPosY.toFixed(2)}`;
+    debugText += `\nCrop TL: ${cropData.x.toFixed(2)}/${cropData.y.toFixed(2)}`;
+    /* debugText += `\nDrag offset: ${dragOffsetX}/${dragOffsetY}`; */
+    /* debugText += `\nCrop dimensions: ${(cropData.scaled.width).toFixed(2)}/${(cropData.scaled.height).toFixed(2)}`; */
+    /* debugText += `\nG/A point distance: ${(anchorDistance.width).toFixed(2)}/${(anchorDistance.height).toFixed(2)}`; */
+    /* debugText += `\nCached  pos: ${cachedCropPosX.toFixed(2)}/${cachedCropPosY.toFixed(2)}`; */
     debug(debugText);
   }
 

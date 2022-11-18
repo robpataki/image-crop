@@ -17,6 +17,17 @@
     #photo-editor {
       user-select: none;
     }
+
+    #preview-image {
+      display: none;
+      width: 327px;
+      height: 420px;
+      border: 1px solid red;
+    }
+
+    #export-canvas {
+      display: none;
+    }
   </style>
 </head>
 
@@ -46,6 +57,7 @@
     <hr/>
     <div>
       <canvas id="editor-canvas"></canvas>
+      <img src="" alt="" id="preview-image" />
       <canvas id="export-canvas"></canvas>
       <br/>
       <textarea id="debug-log" rows="10" style="width: 600px; font-size: 80%;"></textarea>
