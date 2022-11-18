@@ -2,9 +2,9 @@
 // TODO - Prevent editor to crop the image smaller than print dimensions
 
 const ASPECT_RATIO = 35/45; // Use the printed passport photo size in mm
-const PRINT_WIDTH = 1720; // in pixels
+const PRINT_WIDTH = 600; // in pixels
 const PRINT_HEIGHT = Math.round(PRINT_WIDTH / ASPECT_RATIO); // in pixels
-const EDITOR_WIDTH = 600 // in pixels
+const EDITOR_WIDTH = 420 // in pixels
 const EDITOR_HEIGHT = EDITOR_WIDTH / ASPECT_RATIO;// in pixels
 
 const SCALE = window.devicePixelRatio;
@@ -152,17 +152,16 @@ const getAnchorDistance = () => {
 const drawExportImage = (renderWidth, renderHeight) => {
   const canvas = exportCanvas;
   const context = exportCanvas.getContext('2d');
-  
+
+  // Calculate the offset of the crop area from te relative editor image's TL edge
   const imageRatioX = renderWidth / sourceCanvas.width;
-  const canvasPosX = (canvas.width - renderWidth) * 0.5;
-  const canvasPosY = (canvas.height - renderHeight) * 0.5;
-  const imagePosX = (cropData.x - canvasPosX) / imageRatioX;
-  const imagePosY = (cropData.y - canvasPosY) / imageRatioX;
+  const cropOffsetX = Math.round(cropData.x.toFixed(2) - ((editorCanvas.width - renderWidth) * 0.5).toFixed(2));
+  const cropOffsetY = Math.round(cropData.y.toFixed(2) - ((editorCanvas.height - renderHeight) * 0.5).toFixed(2));
 
   context.save();
   context.clearRect(0, 0, canvas.width, canvas.height);
   
-  context.drawImage(sourceCanvas, imagePosX, imagePosY, cropData.width / imageRatioX, cropData.height / imageRatioX, 0, 0, canvas.width, canvas.height);
+  context.drawImage(sourceCanvas, cropOffsetX / imageRatioX, cropOffsetY / imageRatioX, cropData.scaled.width / imageRatioX, cropData.scaled.height / imageRatioX, 0, 0, canvas.width, canvas.height);
 
   context.restore();
 }
@@ -250,10 +249,15 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
    if (cropDragging) {
      // Resize
      if (activeCropCorner) {
-       // Make sure we don't bleed the vertical edges when resizing
        cropWidth = activeCropCorner === CORNER.BOTTOM_RIGHT || activeCropCorner === CORNER.TOP_RIGHT ? pointerPos.x - anchorPoint.x : anchorPoint.x - pointerPos.x;
-      //  TODO - Don't allow the height push the posY above/below the anchorpoint Y
        cropHeight = cropWidth / ASPECT_RATIO;
+
+       // Make sure we don't bleed through the horizontal and vertical edges
+       if (imgOrientation === ORIENTATION.LANDSCAPE) {
+
+       } else {
+
+       }
  
        // Enforce min/max crop dimensions
        if (cropWidth >= maxWidth || cropHeight >= maxHeight) {
@@ -286,28 +290,6 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
        // Move
        newCropPosX = cachedCropPosX + dragOffsetX;
        newCropPosY = cachedCropPosY + dragOffsetY;
-
-       /* if (imgOrientation === ORIENTATION.LANDSCAPE) {
-         if (cachedCropPosX + dragOffsetX > canvas.width - cropWidth && dragOffsetX > 0) {
-           newCropPosX = canvas.width - cropWidth;
-         } else if (cachedCropPosX + dragOffsetX < 0 && dragOffsetX < 0) {
-           newCropPosX = 0;
-         }
- 
-         newCropPosY = cachedCropPosY + dragOffsetY;
-         if (newCropPosY <= (canvas.height - maxHeight) * 0.5) {
-           newCropPosY = (canvas.height - maxHeight) * 0.5;
-         } else if (newCropPosY >= (canvas.height + maxHeight) * 0.5 - cropHeight) {
-           newCropPosY = (canvas.height + maxHeight) * 0.5 - cropHeight;
-         }
-       } else {
-         if (cachedCropPosY + dragOffsetY > canvas.height - cropHeight && dragOffsetY > 0) {
-           newCropPosY = canvas.height - cropHeight;
-         } else if (cachedCropPosY + dragOffsetY < 0 && dragOffsetY < 0) {
-           newCropPosY = 0;
-         }
-         newCropPosX = canvas.width * 0.5 - cropWidth * 0.5;
-       } */
      }
 
      // Lock the sizing within the vertical boundaries
@@ -352,7 +334,6 @@ const drawCropArea = () => {
   context.strokeRect(cropData.scaled.x, cropData.scaled.y, cropData.scaled.width, cropData.scaled.height);
 
   // Draw crop corners
-  /* context.fillStyle = CROP_AREA_COLOUR; */
   context.setLineDash([]);
   context.strokeRect(cropData.scaled.x - CROP_CORNER_SIZE * 0.5, cropData.scaled.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
   context.strokeRect(cropData.scaled.x + cropData.scaled.width - CROP_CORNER_SIZE * 0.5, cropData.scaled.y - CROP_CORNER_SIZE * 0.5, CROP_CORNER_SIZE, CROP_CORNER_SIZE);
@@ -415,8 +396,8 @@ const resizeCanvases = () => {
   );
   setCanvasSize(
     exportCanvas,
-    VIEWPORT_WIDTH,
-    VIEWPORT_HEIGHT,
+    PRINT_WIDTH,
+    PRINT_HEIGHT,
     SCALE
   );
 
@@ -438,6 +419,7 @@ const redrawCanvases = () => {
 };
 
 const onLoadImage = () => {
+  resetData();
   rotationCounter = 0;
   cachedCropPosX = -1;
   cachedCropPosY = -1;
@@ -626,8 +608,8 @@ const init = () => {
   );
   setCanvasSize(
     exportCanvas,
-    VIEWPORT_WIDTH,
-    VIEWPORT_HEIGHT,
+    PRINT_WIDTH,
+    PRINT_HEIGHT,
     SCALE
   );
   setupButtons();
