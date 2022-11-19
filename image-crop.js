@@ -1,9 +1,6 @@
-// TODO - Set minimum crop dimensions based on source and export image dimensions
-// TODO - Display if source photo meets the print dimensions
-
 const DEBUG = false;
 
-const ASPECT_RATIO = 45/25; // Use the printed passport photo size in mm
+const ASPECT_RATIO = 35/45; // Use the printed passport photo size in mm
 const PRINT_WIDTH = 430; // in pixels
 const PRINT_HEIGHT = Math.round(PRINT_WIDTH / ASPECT_RATIO); // in pixels
 const EDITOR_WIDTH = 400 // in pixels
@@ -30,10 +27,14 @@ const ORIENTATION = {
   LANDSCAPE: 'L',
   PORTRAIT: 'P'
 };
+
+let hasSource = false;
+let rotationCounter = 0;
+let ratioX = 0;
 let imgOrientation = '';
+let activeCropCorner = '';
 let anchorPoint = {x: -1, y: -1};
 let anchorDistance = {x: -1, y: -1};
-let activeCropCorner = '';
 let pointerPos = {
   x: -1,
   y: -1,
@@ -52,19 +53,19 @@ let cropData = {
 };
 let cropDragging = false;
 let cropAreaActive = false;
-let dragOffsetX = 0;
-let dragOffsetY = 0;
-let dragPosX = -1;
-let dragPosY = -1;
-let dragStartPosX = -1;
-let dragStartPosY = -1;
-let cachedCropPosX = -1;
-let cachedCropPosY = -1;
-let hasSource = false;
-let rotationCounter = 0;
-let ratioX = 0;
-let scaledImageWidth = 0;
-let scaledImageHeight = 0;
+let dragOffset = {
+  x: 0,
+  y: 0
+};
+let dragPos = {x: -1, y: -1};
+let dragStartPos = {
+  x: -1,
+  y: -1,
+};
+let cachedCropPos = {
+  x: -1,
+  y: -1
+};
 
 // Cache DOM elements
 const previewImage = document.querySelector('#preview-image');
@@ -82,7 +83,6 @@ const toggleSourceButton = document.querySelector('#toggle-source-button');
 const saveButton = document.querySelector('#save-button');
 const debugLog = document.querySelector('#debug-log');
 const img = new Image();
-const reader = new FileReader();
 
 
 /* QUICK MATHS */
@@ -127,20 +127,20 @@ const getAnchorDistance = () => {
 
   switch(activeCropCorner) {
     case CORNER.TOP_LEFT:
-      width = anchorPoint.x - cropData.scaled.x - dragOffsetX;
-      height = anchorPoint.y - cropData.scaled.y - dragOffsetY;
+      width = anchorPoint.x - cropData.scaled.x - dragOffset.x;
+      height = anchorPoint.y - cropData.scaled.y - dragOffset.y;
     break;
     case CORNER.TOP_RIGHT:
-      width = anchorPoint.x - cropData.scaled.x + cropData.scaled.width + dragOffsetX;
-      height = anchorPoint.y - cropData.scaled.y - dragOffsetY;
+      width = anchorPoint.x - cropData.scaled.x + cropData.scaled.width + dragOffset.x;
+      height = anchorPoint.y - cropData.scaled.y - dragOffset.y;
     break;
     case CORNER.BOTTOM_RIGHT:
-      width = anchorPoint.x + cropData.width + dragOffsetX;
-      height = anchorPoint.y + cropData.height + dragOffsetY;
+      width = anchorPoint.x + cropData.width + dragOffset.x;
+      height = anchorPoint.y + cropData.height + dragOffset.y;
     break;
     case CORNER.BOTTOM_LEFT:
-      width = anchorPoint.x / SCALE - cropData.scaled.x - dragOffsetX / SCALE;
-      height = anchorPoint.y / SCALE - cropData.scaled.y + cropData.scaled.height + dragOffsetY / SCALE;
+      width = anchorPoint.x / SCALE - cropData.scaled.x - dragOffset.x / SCALE;
+      height = anchorPoint.y / SCALE - cropData.scaled.y + cropData.scaled.height + dragOffset.y / SCALE;
     break;
   }
 
@@ -245,14 +245,14 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
    const minHeight = minWidth / ASPECT_RATIO;
  
    // Set the initial positions
-   if (cachedCropPosX < 0 && cachedCropPosY < 0) {
-     cachedCropPosX = (canvas.width - maxWidth) * 0.5;
-     cachedCropPosY = (canvas.height - maxHeight) * 0.5;
+   if (cachedCropPos.x < 0 && cachedCropPos.y < 0) {
+     cachedCropPos.x = (canvas.width - maxWidth) * 0.5;
+     cachedCropPos.y = (canvas.height - maxHeight) * 0.5;
    }
    
    // Default position
-   let newCropPosX = cachedCropPosX;
-   let newCropPosY = cachedCropPosY;
+   let newCropPosX = cachedCropPos.x;
+   let newCropPosY = cachedCropPos.y;
  
    // Default dimensions
    let cropWidth = cropData.width > 0 ? cropData.width : maxWidth;
@@ -307,8 +307,8 @@ const setupCropArea = ({imageWidth, imageHeight}) => {
        }
      } else {
        // Move
-       newCropPosX = cachedCropPosX + dragOffsetX;
-       newCropPosY = cachedCropPosY + dragOffsetY;
+       newCropPosX = cachedCropPos.x + dragOffset.x;
+       newCropPosY = cachedCropPos.y + dragOffset.y;
      }
 
 
@@ -447,8 +447,10 @@ const redrawCanvases = () => {
 const onLoadImage = () => {
   resetData();
   rotationCounter = 0;
-  cachedCropPosX = -1;
-  cachedCropPosY = -1;
+  cachedCropPos = {
+    x: -1,
+    y: -1
+  };
   redrawCanvases();
 };
 
@@ -507,8 +509,10 @@ const resetData = () => {
       height: -1,
     }
   };
-  cachedCropPosX = -1;
-  cachedCropPosY = -1;
+  cachedCropPos = {
+    x: -1,
+    y: -1,
+  };
   imgOrientation = '';
 };
 
@@ -572,16 +576,22 @@ const onMouseMove = (e) => {
       setCursor(editorCanvas, 'grab');
     }
   } else {
-    dragPosX = e.clientX * SCALE - rect.left;
-    dragPosY = e.clientY * SCALE - rect.top;
+    dragPos = {
+      x: e.clientX * SCALE - rect.left,
+      y: e.clientY * SCALE - rect.top
+    };
 
-    if (dragStartPosX < 0 && dragStartPosY < 0) {
-      dragStartPosX = dragPosX;
-      dragStartPosY = dragPosY;
+    if (dragStartPos.x < 0 && dragStartPos.y < 0) {
+      dragStartPos = {
+        x: dragPos.x,
+        y: dragPos.y,
+      };
     }
 
-    dragOffsetX = dragPosX - dragStartPosX;
-    dragOffsetY = dragPosY - dragStartPosY;
+    dragOffset = {
+      x: dragPos.x - dragStartPos.x,
+      y: dragPos.y - dragStartPos.y
+    };
 
     drawEditorImage();
   }
@@ -609,14 +619,19 @@ const onMouseUp = (e) => {
   
   checkCropAreaActivity(e);
 
-  cachedCropPosX = cropData.x;
-  cachedCropPosY = cropData.y;
-  dragPosX = -1;
-  dragPosY = -1;
-  dragStartPosX = -1;
-  dragStartPosY = -1;
-  dragOffsetX = 0;
-  dragOffsetY = 0;
+  cachedCropPos = {...cropData};
+  dragPos = {
+    x: -1,
+    y: -1
+  };
+  dragStartPos = {
+    x: -1,
+    y: -1,
+  };
+  dragOffset = {
+    x: 0,
+    y: 0
+  }
 };
 
 initCropAreaInteraction = () => {
@@ -664,10 +679,10 @@ const render = () => {
     debugText += `\nDragging: ${cropDragging}`; */
     debugText += `\nAnchor point: ${anchorPoint.x.toFixed(2)}/${anchorPoint.y.toFixed(2)}`;
     debugText += `\nCrop TL: ${cropData.x.toFixed(2)}/${cropData.y.toFixed(2)}`;
-    /* debugText += `\nDrag offset: ${dragOffsetX}/${dragOffsetY}`; */
+    /* debugText += `\nDrag offset: ${dragOffset.x}/${dragOffset.y}`; */
     debugText += `\nCrop dimensions: ${(cropData.scaled.width).toFixed(2)}/${(cropData.scaled.height).toFixed(2)}`;
     debugText += `\nG/A point distance: ${(anchorDistance.width).toFixed(2)}/${(anchorDistance.height).toFixed(2)}`;
-    /* debugText += `\nCached  pos: ${cachedCropPosX.toFixed(2)}/${cachedCropPosY.toFixed(2)}`; */
+    /* debugText += `\nCached  pos: ${cachedCropPos.x.toFixed(2)}/${cachedCropPos.y.toFixed(2)}`; */
     debug(debugText);
   }
 
