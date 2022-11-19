@@ -3,7 +3,7 @@
 
 const DEBUG = false;
 
-const ASPECT_RATIO = 35/45; // Use the printed passport photo size in mm
+const ASPECT_RATIO = 45/25; // Use the printed passport photo size in mm
 const PRINT_WIDTH = 430; // in pixels
 const PRINT_HEIGHT = Math.round(PRINT_WIDTH / ASPECT_RATIO); // in pixels
 const EDITOR_WIDTH = 400 // in pixels
@@ -228,8 +228,18 @@ const drawEditorImage = () => {
 
 const setupCropArea = ({imageWidth, imageHeight}) => {
   const canvas = editorCanvas;
-  const maxWidth = imgOrientation === ORIENTATION.LANDSCAPE ? imageHeight * ASPECT_RATIO : imageWidth;
-  const maxHeight = maxWidth / ASPECT_RATIO;
+  let maxWidth = imgOrientation === ORIENTATION.LANDSCAPE ? imageHeight * ASPECT_RATIO : imageWidth;
+  let maxHeight = maxWidth / ASPECT_RATIO;
+
+  // Correction in case source image doesn't quite fit the editor frame
+  if (maxHeight > imageHeight) {
+    maxHeight = imageHeight;
+    maxWidth = imageHeight * ASPECT_RATIO;
+  }
+  if (maxWidth > imageWidth) {
+    maxWidth = imageWidth;
+    maxHeight = imageWidth / ASPECT_RATIO;
+  }
 
    const minWidth = 100;
    const minHeight = minWidth / ASPECT_RATIO;
